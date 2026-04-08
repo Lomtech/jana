@@ -41,9 +41,9 @@
     </div>
 
     <div class="tab-bar" style="background:var(--bg-card)">
-      <div class="tab active" data-tab="transactions">Kontobewegungen</div>
-      <div class="tab" data-tab="payments">Zahlungen</div>
-      <div class="tab" data-tab="members">Mitglieder</div>
+      <div class="tab itab active" data-tab="transactions">Kontobewegungen</div>
+      <div class="tab itab" data-tab="payments">Zahlungen</div>
+      <div class="tab itab" data-tab="members">Mitglieder</div>
     </div>
 
     <div class="content">
@@ -189,9 +189,9 @@
   const communityId = getCommunityId();
 
   // ── Tabs ──
-  document.querySelectorAll('.tab').forEach(tab => {
+  document.querySelectorAll('.itab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.itab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       ['transactions','payments','members'].forEach(id => {
         document.getElementById(`tab-${id}`).style.display = id === tab.dataset.tab ? '' : 'none';
