@@ -2,49 +2,36 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Jana – Todesfälle</title>
   <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar" id="sidebar"></aside>
-
   <div class="main">
     <div class="topbar">
       <div class="topbar-title">Todesfälle</div>
       <div class="topbar-actions">
-        <button class="btn btn-primary" id="new-case-btn">+ Todesfall erfassen</button>
+        <button class="btn btn-primary" id="new-case-btn">+ Todesfall</button>
       </div>
     </div>
 
     <div class="content">
-      <!-- Aktive Fälle -->
       <div id="active-cases"></div>
 
-      <!-- Alle Fälle -->
       <div class="card">
-        <div class="card-header">
-          <div class="card-title">Alle Todesfälle</div>
-        </div>
-        <div class="table-head" style="grid-template-columns: 1fr 100px 100px 90px 80px">
-          <div>Verstorbene/r</div>
-          <div>Todesdatum</div>
-          <div>Erfasst am</div>
-          <div class="text-center">Status</div>
-          <div></div>
-        </div>
-        <div id="cases-table">
-          <div class="empty-state">Wird geladen…</div>
-        </div>
+        <div class="card-header"><div class="card-title">Alle Fälle</div></div>
+        <div id="cases-table"><div class="empty-state">Wird geladen…</div></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Modal: Neuer Todesfall -->
+<!-- Modal: Neuer Fall -->
 <div class="modal-overlay hidden" id="modal-case">
   <div class="modal">
+    <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title">Todesfall erfassen</div>
       <button class="modal-close" id="mc-close">×</button>
@@ -56,27 +43,21 @@
       </div>
       <div class="form-group">
         <label class="form-label">Mitglied (falls bekannt)</label>
-        <select id="c-member" class="form-select">
-          <option value="">— Kein Mitglied / Extern —</option>
-        </select>
+        <select id="c-member" class="form-select"><option value="">— Kein Mitglied —</option></select>
       </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">Todesdatum *</label>
-          <input type="date" id="c-date" class="form-input">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Sterbeort</label>
-          <input type="text" id="c-location" class="form-input" placeholder="München">
-        </div>
+      <div class="form-group">
+        <label class="form-label">Todesdatum *</label>
+        <input type="date" id="c-date" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sterbeort</label>
+        <input type="text" id="c-location" class="form-input" placeholder="München">
       </div>
       <div class="form-group">
         <label class="form-label">Bestattungsort</label>
         <input type="text" id="c-burial" class="form-input" placeholder="Istanbul, Türkei">
       </div>
-      <div style="background:var(--red-light); border:0.5px solid #F0ABAB; border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:var(--red)">
-        Mit dem Erfassen wird der Fall im Audit-Log dokumentiert. Die Auszahlung wird in einem separaten Schritt eingetragen.
-      </div>
+      <div class="info-box red">Die Erfassung wird sofort im Audit-Log dokumentiert.</div>
     </div>
     <div class="modal-footer">
       <button class="btn" id="mc-cancel">Abbrechen</button>
@@ -88,6 +69,7 @@
 <!-- Modal: Auszahlung -->
 <div class="modal-overlay hidden" id="modal-payout">
   <div class="modal">
+    <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title" id="payout-title">Auszahlung eintragen</div>
       <button class="modal-close" id="mpo-close">×</button>
@@ -95,19 +77,17 @@
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Betrag (€) *</label>
-        <input type="number" id="po-amount" class="form-input" step="0.01" min="0">
+        <input type="number" id="po-amount" class="form-input" inputmode="decimal" step="0.01">
       </div>
       <div class="form-group">
         <label class="form-label">Empfänger / Verwendungszweck *</label>
-        <input type="text" id="po-desc" class="form-input" placeholder="Familie Al-Rashid — Beerdigungskosten">
+        <input type="text" id="po-desc" class="form-input" placeholder="Familie — Beerdigungskosten">
       </div>
       <div class="form-group">
         <label class="form-label">Notiz</label>
-        <textarea id="po-note" class="form-textarea" placeholder="Weitere Details zur Auszahlung…"></textarea>
+        <textarea id="po-note" class="form-textarea" placeholder="Weitere Details…"></textarea>
       </div>
-      <div style="background:var(--amber-light); border:0.5px solid var(--amber-border); border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:#633806">
-        Die Auszahlung wird als Transaktion (Ausgang) im Kassenbuch verbucht und ist unveränderlich im Audit-Log gespeichert.
-      </div>
+      <div class="info-box amber">Auszahlung wird als unveränderliche Transaktion verbucht.</div>
     </div>
     <div class="modal-footer">
       <button class="btn" id="mpo-cancel">Abbrechen</button>
@@ -116,20 +96,17 @@
   </div>
 </div>
 
-<!-- Modal: Fall abschließen -->
+<!-- Modal: Abschließen -->
 <div class="modal-overlay hidden" id="modal-close-case">
   <div class="modal">
+    <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title">Fall abschließen</div>
       <button class="modal-close" id="mcc-x">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px; color:var(--text-muted)">
-        Bist du sicher, dass dieser Fall vollständig abgeschlossen ist? Alle Auszahlungen wurden getätigt?
-      </p>
-      <div style="margin-top:12px; background:var(--green-light); border:0.5px solid var(--green-border); border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:var(--green-dark)">
-        Der Fall wird als <strong>abgeschlossen</strong> markiert und bleibt im Archiv erhalten.
-      </div>
+      <p style="font-size:13px;color:var(--text-muted)">Alle Auszahlungen wurden getätigt? Der Fall wird als abgeschlossen markiert.</p>
+      <div class="info-box green" style="margin-top:4px">Der Fall bleibt im Archiv erhalten — er wird nur als abgeschlossen markiert.</div>
     </div>
     <div class="modal-footer">
       <button class="btn" id="mcc-cancel">Abbrechen</button>
@@ -146,211 +123,91 @@
   const membership = await requireAuth();
   if (!membership) throw new Error('not logged in');
   renderLayout('cases');
-
   const communityId = getCommunityId();
   let activeCaseId = null;
+  if (!isAdmin()) document.getElementById('new-case-btn').style.display = 'none';
 
-  if (!isAdmin()) {
-    document.getElementById('new-case-btn').style.display = 'none';
-  }
-
-  // ── Mitglieder für Dropdown ──
-  async function fillMemberSelect() {
-    const { data } = await supabase
-      .from('memberships')
-      .select('id, profiles(full_name)')
-      .eq('community_id', communityId)
-      .eq('status', 'aktiv')
-      .order('profiles(full_name)');
-
+  async function fillMembers() {
+    const { data } = await supabase.from('memberships').select('id, profiles(full_name)').eq('community_id', communityId).eq('status', 'aktiv');
     const sel = document.getElementById('c-member');
-    data?.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.profiles?.full_name || '—';
-      sel.appendChild(opt);
-    });
+    data?.forEach(m => { const opt = document.createElement('option'); opt.value = m.id; opt.textContent = m.profiles?.full_name || '—'; sel.appendChild(opt); });
   }
 
-  // ── Fälle laden ──
-  async function loadCases() {
-    const { data } = await supabase
-      .from('cases')
-      .select('*, profiles(full_name)')
-      .eq('community_id', communityId)
-      .order('created_at', { ascending: false });
-
+  async function load() {
+    const { data } = await supabase.from('cases').select('*, profiles(full_name)').eq('community_id', communityId).order('created_at', { ascending: false });
     const cases = data || [];
-
-    // Aktive Fälle oben als Alert
     const active = cases.filter(c => c.status !== 'abgeschlossen');
-    const activeEl = document.getElementById('active-cases');
-    activeEl.innerHTML = active.map(c => `
+
+    document.getElementById('active-cases').innerHTML = active.map(c => `
       <div class="alert alert-warn">
-        <div>
+        <div style="flex:1;min-width:0">
           <div class="alert-title">Offener Fall — ${c.deceased_name}</div>
-          <div class="alert-sub">Todesdatum: ${formatDate(c.death_date)} · Sterbeort: ${c.death_location || '—'} · Bestattung: ${c.burial_location || '—'}</div>
-          <div class="alert-sub" style="margin-top:4px">Eröffnet von: ${c.profiles?.full_name || '—'} am ${formatDate(c.created_at)}</div>
+          <div class="alert-sub">Todesdatum: ${formatDate(c.death_date)} · ${c.death_location || '—'}</div>
+          <div class="alert-sub">Bestattung: ${c.burial_location || '—'}</div>
         </div>
-        <div style="display:flex; gap:8px; flex-shrink:0">
-          ${isAdmin() ? `
-            <button class="btn btn-sm" onclick="openPayout('${c.id}', '${c.deceased_name}')">Auszahlung</button>
-            <button class="btn btn-sm btn-primary" onclick="openCloseCase('${c.id}')">Abschließen</button>
-          ` : ''}
+        <div style="display:flex;gap:6px;flex-shrink:0;flex-direction:column;align-items:flex-end">
+          ${isAdmin() ? `<button class="btn btn-sm" onclick="openPayout('${c.id}','${c.deceased_name}')">Auszahlung</button><button class="btn btn-sm btn-primary" onclick="openClose('${c.id}')">Abschließen</button>` : ''}
         </div>
       </div>`).join('') || '';
 
-    // Alle Fälle Tabelle
-    if (!cases.length) {
-      document.getElementById('cases-table').innerHTML = '<div class="empty-state">Noch keine Todesfälle erfasst</div>';
-      return;
-    }
-
+    if (!cases.length) { document.getElementById('cases-table').innerHTML = '<div class="empty-state">Noch keine Todesfälle</div>'; return; }
     document.getElementById('cases-table').innerHTML = cases.map(c => {
-      const statusPill =
-        c.status === 'abgeschlossen' ? '<span class="pill pill-green">Abgeschlossen</span>' :
-        c.status === 'bearbeitung'   ? '<span class="pill pill-amber">In Bearbeitung</span>' :
-                                       '<span class="pill pill-red">Offen</span>';
-      return `
-        <div class="row" style="grid-template-columns: 1fr 100px 100px 90px 80px">
-          <div>
-            <div class="name-line">${c.deceased_name}</div>
-            <div class="sub-line">${c.burial_location || '—'} · Eröffnet von ${c.profiles?.full_name || '—'}</div>
-          </div>
-          <div class="text-muted text-small">${formatDate(c.death_date)}</div>
-          <div class="text-muted text-small">${formatDate(c.created_at)}</div>
-          <div class="text-center">${statusPill}</div>
-          <div class="text-right">
-            ${c.status !== 'abgeschlossen' && isAdmin() ? `
-              <button class="btn btn-sm" onclick="openPayout('${c.id}', '${c.deceased_name}')">Auszahlung</button>
-            ` : ''}
-          </div>
-        </div>`;
+      const pill = c.status === 'abgeschlossen' ? '<span class="pill pill-green">Abgeschlossen</span>' : c.status === 'bearbeitung' ? '<span class="pill pill-amber">In Bearbeitung</span>' : '<span class="pill pill-red">Offen</span>';
+      return `<div class="row" style="grid-template-columns:1fr auto">
+        <div>
+          <div class="name-line">${c.deceased_name}</div>
+          <div class="sub-line">Todesdatum: ${formatDate(c.death_date)} · ${c.burial_location || '—'}</div>
+          <div class="sub-line">Eröffnet: ${formatDate(c.created_at)} von ${c.profiles?.full_name || '—'}</div>
+        </div>
+        ${pill}
+      </div>`;
     }).join('');
   }
 
-  // ── Neuer Fall ──
-  document.getElementById('new-case-btn').addEventListener('click', () => {
-    document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
-    openModal('modal-case');
-  });
+  document.getElementById('new-case-btn').addEventListener('click', () => { document.getElementById('c-date').value = new Date().toISOString().split('T')[0]; openModal('modal-case'); });
   document.getElementById('mc-close').addEventListener('click',  () => closeModal('modal-case'));
   document.getElementById('mc-cancel').addEventListener('click', () => closeModal('modal-case'));
-
   document.getElementById('mc-save').addEventListener('click', async () => {
-    const name     = document.getElementById('c-name').value.trim();
-    const memberId = document.getElementById('c-member').value || null;
-    const date     = document.getElementById('c-date').value;
-    const location = document.getElementById('c-location').value.trim();
-    const burial   = document.getElementById('c-burial').value.trim();
-
-    if (!name || !date) return showToast('Name und Todesdatum sind Pflichtfelder', 'error');
-
-    const btn = document.getElementById('mc-save');
-    btn.disabled = true;
-
+    const name = document.getElementById('c-name').value.trim();
+    const date = document.getElementById('c-date').value;
+    if (!name || !date) return showToast('Name und Datum erforderlich', 'error');
+    const btn = document.getElementById('mc-save'); btn.disabled = true;
     const user = (await supabase.auth.getUser()).data.user;
-
-    // Membership-ID aus Mitglied-Dropdown
-    let membershipId = null;
-    if (memberId) membershipId = memberId;
-
-    const { data: newCase, error } = await supabase.from('cases').insert({
-      community_id:    communityId,
-      deceased_name:   name,
-      membership_id:   membershipId,
-      death_date:      date,
-      death_location:  location,
-      burial_location: burial,
-      status:          'offen',
-      opened_by:       user?.id,
-    }).select().single();
-
-    if (error) { showToast('Fehler beim Erfassen', 'error'); btn.disabled = false; return; }
-
-    await writeAuditLog(`Todesfall erfasst: ${name}`, 'case', newCase.id, { date, location, burial });
-
-    showToast(`Todesfall "${name}" erfasst`);
-    closeModal('modal-case');
-    btn.disabled = false;
+    const { data: nc, error } = await supabase.from('cases').insert({ community_id: communityId, deceased_name: name, membership_id: document.getElementById('c-member').value || null, death_date: date, death_location: document.getElementById('c-location').value.trim(), burial_location: document.getElementById('c-burial').value.trim(), status: 'offen', opened_by: user?.id }).select().single();
+    if (error) { showToast('Fehler', 'error'); btn.disabled = false; return; }
+    await writeAuditLog(`Todesfall erfasst: ${name}`, 'case', nc.id);
+    showToast(`Fall "${name}" erfasst`); closeModal('modal-case'); btn.disabled = false;
     ['c-name','c-location','c-burial'].forEach(id => document.getElementById(id).value = '');
-    await loadCases();
+    await load();
   });
 
-  // ── Auszahlung ──
-  window.openPayout = (caseId, caseName) => {
-    activeCaseId = caseId;
-    document.getElementById('payout-title').textContent = `Auszahlung — ${caseName}`;
-    document.getElementById('po-amount').value = '';
-    document.getElementById('po-desc').value   = `Familie — Beerdigungskosten`;
-    document.getElementById('po-note').value   = '';
-    openModal('modal-payout');
-  };
-
+  window.openPayout = (id, name) => { activeCaseId = id; document.getElementById('payout-title').textContent = `Auszahlung — ${name}`; document.getElementById('po-amount').value = ''; document.getElementById('po-desc').value = 'Familie — Beerdigungskosten'; document.getElementById('po-note').value = ''; openModal('modal-payout'); };
   document.getElementById('mpo-close').addEventListener('click',  () => closeModal('modal-payout'));
   document.getElementById('mpo-cancel').addEventListener('click', () => closeModal('modal-payout'));
-
   document.getElementById('mpo-save').addEventListener('click', async () => {
     const amount = parseFloat(document.getElementById('po-amount').value);
     const desc   = document.getElementById('po-desc').value.trim();
-    if (!amount || !desc) return showToast('Betrag und Beschreibung eingeben', 'error');
-
-    const btn = document.getElementById('mpo-save');
-    btn.disabled = true;
-
+    if (!amount || !desc) return showToast('Betrag und Beschreibung erforderlich', 'error');
+    const btn = document.getElementById('mpo-save'); btn.disabled = true;
     const user = (await supabase.auth.getUser()).data.user;
-
-    await supabase.from('transactions').insert({
-      community_id: communityId,
-      case_id:      activeCaseId,
-      amount,
-      direction:    'ausgang',
-      description:  desc,
-      recorded_by:  user?.id,
-    });
-
-    // Fall auf "in Bearbeitung" setzen
+    await supabase.from('transactions').insert({ community_id: communityId, case_id: activeCaseId, amount, direction: 'ausgang', description: desc, recorded_by: user?.id });
     await supabase.from('cases').update({ status: 'bearbeitung' }).eq('id', activeCaseId);
-
-    await writeAuditLog(
-      `Auszahlung eingetragen: ${formatEur(amount)} — ${desc}`,
-      'transaction', activeCaseId, { amount, desc }
-    );
-
-    showToast(`Auszahlung von ${formatEur(amount)} eingetragen`);
-    closeModal('modal-payout');
-    btn.disabled = false;
-    await loadCases();
+    await writeAuditLog(`Auszahlung ${formatEur(amount)}: ${desc}`, 'transaction', activeCaseId);
+    showToast(`Auszahlung ${formatEur(amount)} eingetragen`); closeModal('modal-payout'); btn.disabled = false; await load();
   });
 
-  // ── Fall abschließen ──
-  window.openCloseCase = (caseId) => {
-    activeCaseId = caseId;
-    openModal('modal-close-case');
-  };
-
+  window.openClose = (id) => { activeCaseId = id; openModal('modal-close-case'); };
   document.getElementById('mcc-x').addEventListener('click',       () => closeModal('modal-close-case'));
   document.getElementById('mcc-cancel').addEventListener('click',  () => closeModal('modal-close-case'));
-
   document.getElementById('mcc-confirm').addEventListener('click', async () => {
-    const btn = document.getElementById('mcc-confirm');
-    btn.disabled = true;
-
-    await supabase.from('cases').update({
-      status: 'abgeschlossen',
-      closed_at: new Date().toISOString(),
-    }).eq('id', activeCaseId);
-
+    const btn = document.getElementById('mcc-confirm'); btn.disabled = true;
+    await supabase.from('cases').update({ status: 'abgeschlossen', closed_at: new Date().toISOString() }).eq('id', activeCaseId);
     await writeAuditLog('Fall abgeschlossen', 'case', activeCaseId);
-
-    showToast('Fall wurde abgeschlossen');
-    closeModal('modal-close-case');
-    btn.disabled = false;
-    await loadCases();
+    showToast('Fall abgeschlossen'); closeModal('modal-close-case'); btn.disabled = false; await load();
   });
 
-  await fillMemberSelect();
-  await loadCases();
+  await fillMembers();
+  await load();
 </script>
 </body>
 </html>

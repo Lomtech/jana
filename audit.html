@@ -2,53 +2,44 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Jana – Audit-Log</title>
   <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar" id="sidebar"></aside>
-
   <div class="main">
     <div class="topbar">
       <div class="topbar-title">Audit-Log</div>
     </div>
 
     <div class="content">
-      <!-- Trust Banner -->
       <div class="alert alert-green">
         <div>
-          <div class="alert-title" style="color:var(--green-dark)">Dieser Log ist unveränderlich</div>
-          <div class="alert-sub">Kein Eintrag kann gelöscht, editiert oder rückwirkend geändert werden — von niemandem, auch nicht vom Admin.</div>
+          <div class="alert-title">Unveränderlicher Log</div>
+          <div class="alert-sub">Kein Eintrag kann gelöscht oder editiert werden — von niemandem.</div>
         </div>
       </div>
 
+      <!-- Suche + Filter -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" id="search" class="form-input" placeholder="Suchen…" style="flex:1;min-width:140px">
+        <select id="filter-type" class="form-select" style="width:auto;padding-right:28px">
+          <option value="">Alle Typen</option>
+          <option value="payment">Zahlungen</option>
+          <option value="case">Todesfälle</option>
+          <option value="transaction">Transaktionen</option>
+          <option value="membership">Mitglieder</option>
+        </select>
+      </div>
+
       <div class="card">
-        <div class="card-header">
-          <div class="card-title">Alle Aktionen</div>
-          <div style="display:flex; gap:8px; align-items:center">
-            <input type="text" id="search" class="form-input" placeholder="Suchen…" style="width:180px; font-size:12px; padding:5px 10px">
-            <select id="filter-type" class="form-select" style="font-size:12px; padding:6px 10px; width:auto">
-              <option value="">Alle Typen</option>
-              <option value="payment">Zahlungen</option>
-              <option value="case">Todesfälle</option>
-              <option value="transaction">Transaktionen</option>
-              <option value="membership">Mitglieder</option>
-            </select>
-          </div>
+        <div style="padding:8px 16px;background:var(--bg-sub);border-bottom:0.5px solid var(--border);font-size:11px;color:var(--text-muted)">
+          Einsehbar für alle Mitglieder — Datenschutz: keine Adressen oder Telefonnummern sichtbar.
         </div>
-
-        <!-- Info für Mitglieder -->
-        <div style="padding:10px 18px; background:var(--bg-sub); border-bottom:0.5px solid var(--border); font-size:12px; color:var(--text-muted)">
-          Dieser Log ist für alle Mitglieder einsehbar — aus Datenschutzgründen werden keine Adressen oder Telefonnummern angezeigt.
-        </div>
-
-        <div id="audit-table">
-          <div class="empty-state">Wird geladen…</div>
-        </div>
-
-        <div id="load-more-wrap" style="padding:14px; text-align:center; display:none">
+        <div id="audit-table"><div class="empty-state">Wird geladen…</div></div>
+        <div id="load-more-wrap" style="padding:14px;text-align:center;display:none">
           <button class="btn" id="load-more">Mehr laden</button>
         </div>
       </div>
@@ -64,128 +55,63 @@
   const membership = await requireAuth();
   if (!membership) throw new Error('not logged in');
   renderLayout('audit');
-
   const communityId = getCommunityId();
-  const PAGE_SIZE = 30;
-  let offset = 0;
-  let allRows = [];
-  let filterType = '';
-  let searchTerm = '';
+  const PAGE = 30;
+  let offset = 0, allRows = [], filterType = '', searchTerm = '';
+
+  const BADGES = {
+    payment:     ['Zahlung',     'pill-green'],
+    case:        ['Todesfall',   'pill-red'],
+    transaction: ['Transaktion', 'pill-amber'],
+    membership:  ['Mitglied',    'pill-gray'],
+  };
 
   async function loadMore(reset = false) {
     if (reset) { offset = 0; allRows = []; }
-
-    let query = supabase
-      .from('audit_log')
-      .select('*, profiles(full_name)')
-      .eq('community_id', communityId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1);
-
-    if (filterType) query = query.eq('entity_type', filterType);
-
-    const { data } = await query;
+    let q = supabase.from('audit_log').select('*, profiles(full_name)').eq('community_id', communityId).order('created_at', { ascending: false }).range(offset, offset + PAGE - 1);
+    if (filterType) q = q.eq('entity_type', filterType);
+    const { data } = await q;
     const rows = data || [];
     allRows = reset ? rows : [...allRows, ...rows];
     offset += rows.length;
-
-    document.getElementById('load-more-wrap').style.display = rows.length === PAGE_SIZE ? 'block' : 'none';
-    renderTable();
+    document.getElementById('load-more-wrap').style.display = rows.length === PAGE ? 'block' : 'none';
+    render();
   }
 
-  function getFiltered() {
-    if (!searchTerm) return allRows;
+  function render() {
     const q = searchTerm.toLowerCase();
-    return allRows.filter(a =>
-      a.action?.toLowerCase().includes(q) ||
-      a.profiles?.full_name?.toLowerCase().includes(q)
-    );
-  }
+    const list = q ? allRows.filter(a => a.action?.toLowerCase().includes(q) || a.profiles?.full_name?.toLowerCase().includes(q)) : allRows;
+    const el = document.getElementById('audit-table');
+    if (!list.length) { el.innerHTML = '<div class="empty-state">Keine Einträge</div>'; return; }
 
-  function renderTable() {
-    const list = getFiltered();
-    const el   = document.getElementById('audit-table');
-
-    if (!list.length) {
-      el.innerHTML = '<div class="empty-state">Keine Einträge gefunden</div>';
-      return;
-    }
-
-    // Nach Tagen gruppieren
-    let currentDay = '';
-    let html = '';
-
+    let currentDay = '', html = '';
     list.forEach(a => {
-      const d = new Date(a.created_at);
-      const day = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+      const d   = new Date(a.created_at);
+      const day = d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
       if (day !== currentDay) {
         currentDay = day;
-        html += `
-          <div style="padding: 8px 18px 4px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-faint); background:var(--bg-sub); border-bottom:0.5px solid var(--border)">
-            ${day}
-          </div>`;
+        html += `<div style="padding:7px 16px 4px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-faint);background:var(--bg-sub);border-bottom:0.5px solid var(--border)">${day}</div>`;
       }
-
-      const time   = d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-      const actor  = a.profiles?.full_name || 'System';
-      const typeBadge = getTypeBadge(a.entity_type);
-
-      html += `
-        <div class="audit-row">
-          <div class="audit-time">${time}</div>
-          <div style="flex:1">
-            <span class="audit-actor">${actor}</span>
-            <span style="color:var(--text-muted)"> · </span>
-            ${a.action}
-            ${typeBadge}
-          </div>
-          <div style="font-family: 'DM Mono', monospace; font-size:10px; color:var(--text-faint); white-space:nowrap; margin-top:1px">
-            ID: ${a.id}
-          </div>
-        </div>`;
+      const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const b = BADGES[a.entity_type];
+      const badge = b ? `<span class="pill ${b[1]}" style="font-size:10px;padding:2px 7px;margin-left:6px">${b[0]}</span>` : '';
+      html += `<div class="audit-row">
+        <div class="audit-time">${time}</div>
+        <div style="flex:1;min-width:0">
+          <span class="audit-actor">${a.profiles?.full_name ?? 'System'}</span>${badge}<br>
+          <span style="color:var(--text-muted)">${a.action}</span>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-faint);white-space:nowrap;padding-left:8px">#${a.id}</div>
+      </div>`;
     });
-
     el.innerHTML = html;
   }
 
-  function getTypeBadge(type) {
-    const map = {
-      payment:     ['Zahlung',     'pill-green'],
-      case:        ['Todesfall',   'pill-red'],
-      transaction: ['Transaktion', 'pill-amber'],
-      membership:  ['Mitglied',    'pill-gray'],
-    };
-    if (!type || !map[type]) return '';
-    const [label, cls] = map[type];
-    return `<span class="pill ${cls}" style="margin-left:8px; font-size:10px; padding:2px 7px">${label}</span>`;
-  }
-
-  // Filter
-  document.getElementById('filter-type').addEventListener('change', async e => {
-    filterType = e.target.value;
-    await loadMore(true);
-  });
-
-  // Suche (nur in bereits geladenen)
-  document.getElementById('search').addEventListener('input', e => {
-    searchTerm = e.target.value;
-    renderTable();
-  });
-
-  // Load more
+  document.getElementById('filter-type').addEventListener('change', async e => { filterType = e.target.value; await loadMore(true); });
+  document.getElementById('search').addEventListener('input', e => { searchTerm = e.target.value; render(); });
   document.getElementById('load-more').addEventListener('click', () => loadMore());
 
-  // Realtime: neuer Audit-Eintrag
-  supabase.channel('audit-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log',
-        filter: `community_id=eq.${communityId}` },
-      (payload) => {
-        // Oben prependen ohne neu zu laden
-        allRows.unshift(payload.new);
-        renderTable();
-      }
-    )
-    .subscribe();
+  supabase.channel('audit').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log', filter: `community_id=eq.${communityId}` }, p => { allRows.unshift(p.new); render(); }).subscribe();
 
   await loadMore(true);
 </script>

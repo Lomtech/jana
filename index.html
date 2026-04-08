@@ -2,33 +2,31 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Jana – Dashboard</title>
   <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar" id="sidebar"></aside>
-
   <div class="main">
     <div class="topbar">
       <div class="topbar-title">Dashboard</div>
       <div class="topbar-actions">
-        <button class="btn" onclick="window.location.href='/payments.html'">Zahlung eintragen</button>
+        <button class="btn hide-mobile" onclick="window.location.href='/payments.html'">Zahlung eintragen</button>
         <button class="btn btn-primary" onclick="window.location.href='/members.html'">+ Mitglied</button>
       </div>
     </div>
 
     <div class="content">
-      <!-- Offener Todesfall Alert -->
-      <div id="case-alert" style="display:none"></div>
+      <div id="case-alert"></div>
 
       <!-- Kassenstand -->
-      <div class="balance-banner" id="balance-banner">
+      <div class="balance-banner">
         <div>
           <div class="balance-label">Kassenstand</div>
-          <div class="balance-amount" id="balance-amount">Wird geladen…</div>
-          <div class="balance-meta" id="balance-meta">Echtzeit · wird berechnet</div>
+          <div class="balance-amount" id="balance-amount">…</div>
+          <div class="balance-meta" id="balance-meta">wird berechnet</div>
         </div>
         <div class="balance-badges" id="balance-badges"></div>
       </div>
@@ -53,39 +51,34 @@
       </div>
 
       <div class="two-col">
-        <!-- Mitglieder (letzte) -->
+        <!-- Mitglieder -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Mitglieder — Status</div>
-            <a class="card-link" href="/members.html">Alle anzeigen →</a>
+            <div class="card-title">Mitglieder</div>
+            <a class="card-link" href="/members.html">Alle →</a>
           </div>
-          <div id="members-list">
-            <div class="empty-state">Wird geladen…</div>
-          </div>
+          <div id="members-list"><div class="empty-state">Wird geladen…</div></div>
         </div>
 
-        <!-- Letzte Transaktionen + Audit -->
         <div class="gap-stack">
+          <!-- Transaktionen -->
           <div class="card">
             <div class="card-header">
-              <div class="card-title">Letzte Transaktionen</div>
+              <div class="card-title">Letzte Buchungen</div>
               <a class="card-link" href="/transactions.html">Alle →</a>
             </div>
-            <div id="tx-list">
-              <div class="empty-state">Wird geladen…</div>
-            </div>
+            <div id="tx-list"><div class="empty-state">Wird geladen…</div></div>
           </div>
 
+          <!-- Audit -->
           <div class="card">
             <div class="card-header">
               <div class="card-title">Audit-Log</div>
               <a class="card-link" href="/audit.html">Vollständig →</a>
             </div>
-            <div id="audit-list">
-              <div class="empty-state">Wird geladen…</div>
-            </div>
-            <div style="padding:8px 18px; font-size:11px; color:var(--text-faint); border-top:0.5px solid var(--border)">
-              Alle Einträge sind unveränderlich — kein Eintrag kann gelöscht werden.
+            <div id="audit-list"><div class="empty-state">Wird geladen…</div></div>
+            <div style="padding:8px 16px;font-size:11px;color:var(--text-faint);border-top:0.5px solid var(--border)">
+              Alle Einträge sind unveränderlich.
             </div>
           </div>
         </div>
@@ -108,225 +101,97 @@
   const month = now.getMonth() + 1;
   const year  = now.getFullYear();
 
-  // ── Kassenstand (live view) ──
   async function loadBalance() {
-    const { data } = await supabase
-      .from('community_balance')
-      .select('*')
-      .eq('community_id', communityId)
-      .single();
-
+    const { data } = await supabase.from('community_balance').select('*').eq('community_id', communityId).single();
     document.getElementById('balance-amount').textContent = formatEur(data?.balance ?? 0);
-    document.getElementById('balance-meta').textContent =
-      `Echtzeit · ${new Date().toLocaleString('de-DE')}`;
+    document.getElementById('balance-meta').textContent = `Echtzeit · ${new Date().toLocaleString('de-DE')}`;
   }
 
-  // ── Mitgliederanzahl für Badge ──
-  async function loadMemberCount() {
-    const { count } = await supabase
-      .from('memberships')
-      .select('*', { count: 'exact', head: true })
-      .eq('community_id', communityId)
-      .eq('status', 'aktiv');
-
-    const { data: comm } = await supabase
-      .from('communities')
-      .select('monthly_fee')
-      .eq('id', communityId)
-      .single();
-
+  async function loadBadges() {
+    const { count } = await supabase.from('memberships').select('*', { count: 'exact', head: true }).eq('community_id', communityId).eq('status', 'aktiv');
+    const { data: comm } = await supabase.from('communities').select('monthly_fee').eq('id', communityId).single();
     document.getElementById('balance-badges').innerHTML = `
-      <div class="balance-badge">${count} Mitglieder</div>
-      <div class="balance-badge">${formatEur(comm?.monthly_fee)} / Monat</div>
-    `;
+      <div class="balance-badge">${count ?? 0} Mitglieder</div>
+      <div class="balance-badge">${formatEur(comm?.monthly_fee)} / Monat</div>`;
   }
 
-  // ── Zahlungsmetriken ──
-  async function loadPaymentMetrics() {
-    // Alle aktiven Mitglieder
-    const { count: totalMembers } = await supabase
-      .from('memberships')
-      .select('*', { count: 'exact', head: true })
-      .eq('community_id', communityId)
-      .eq('status', 'aktiv');
-
-    // Bezahlt diesen Monat
-    const { count: paidCount } = await supabase
-      .from('payments')
-      .select('memberships!inner(community_id)', { count: 'exact', head: true })
-      .eq('memberships.community_id', communityId)
-      .eq('period_month', month)
-      .eq('period_year', year);
-
-    const open = totalMembers - paidCount;
-    const pct  = totalMembers ? Math.round((paidCount / totalMembers) * 100) : 0;
-
-    document.getElementById('m-paid').textContent = `${paidCount} / ${totalMembers}`;
-    document.getElementById('m-paid-sub').className = `metric-sub ${pct >= 80 ? 'good' : pct >= 50 ? 'warn' : 'bad'}`;
-    document.getElementById('m-paid-sub').textContent = `${pct} % bezahlt — ${monthLabel(month, year)}`;
-
-    document.getElementById('m-open').textContent = open;
-    document.getElementById('m-open-sub').className = `metric-sub ${open === 0 ? 'good' : 'warn'}`;
-    document.getElementById('m-open-sub').textContent = open === 0 ? 'Alle bezahlt!' : 'noch ausstehend';
+  async function loadMetrics() {
+    const { count: total } = await supabase.from('memberships').select('*', { count: 'exact', head: true }).eq('community_id', communityId).eq('status', 'aktiv');
+    const { count: paid } = await supabase.from('payments').select('memberships!inner(community_id)', { count: 'exact', head: true }).eq('memberships.community_id', communityId).eq('period_month', month).eq('period_year', year);
+    const open = (total ?? 0) - (paid ?? 0);
+    const pct  = total ? Math.round(((paid ?? 0) / total) * 100) : 0;
+    document.getElementById('m-paid').textContent    = `${paid ?? 0} / ${total ?? 0}`;
+    document.getElementById('m-paid-sub').className  = `metric-sub ${pct >= 80 ? 'good' : pct >= 50 ? 'warn' : 'bad'}`;
+    document.getElementById('m-paid-sub').textContent = `${pct} % — ${monthLabel(month, year)}`;
+    document.getElementById('m-open').textContent    = open;
+    document.getElementById('m-open-sub').textContent = open === 0 ? 'Alle bezahlt!' : 'ausstehend';
+    document.getElementById('m-open-sub').className  = `metric-sub ${open === 0 ? 'good' : 'warn'}`;
   }
 
-  // ── Auszahlungen gesamt ──
   async function loadPayouts() {
-    const { count } = await supabase
-      .from('transactions')
-      .select('*', { count: 'exact', head: true })
-      .eq('community_id', communityId)
-      .eq('direction', 'ausgang');
+    const { count } = await supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('community_id', communityId).eq('direction', 'ausgang');
     document.getElementById('m-payouts').textContent = count ?? 0;
   }
 
-  // ── Offener Todesfall ──
   async function loadOpenCase() {
-    const { data } = await supabase
-      .from('cases')
-      .select('*')
-      .eq('community_id', communityId)
-      .in('status', ['offen','bearbeitung'])
-      .order('created_at', { ascending: false })
-      .limit(1);
-
+    const { data } = await supabase.from('cases').select('*').eq('community_id', communityId).in('status', ['offen','bearbeitung']).order('created_at', { ascending: false }).limit(1);
+    const el = document.getElementById('case-alert');
     if (data?.length) {
       const c = data[0];
-      document.getElementById('case-alert').style.display = 'flex';
-      document.getElementById('case-alert').innerHTML = `
-        <div class="alert alert-warn" style="width:100%">
-          <div>
-            <div class="alert-title">Offener Todesfall — ${c.deceased_name}</div>
-            <div class="alert-sub">Geöffnet am ${formatDate(c.death_date)} · Status: ${c.status}</div>
-          </div>
-          <a class="btn btn-sm" href="/cases.html">Zum Fall →</a>
-        </div>`;
+      el.innerHTML = `<div class="alert alert-warn">
+        <div>
+          <div class="alert-title">Offener Fall — ${c.deceased_name}</div>
+          <div class="alert-sub">Todesdatum: ${formatDate(c.death_date)}</div>
+        </div>
+        <a class="btn btn-sm" href="/cases.html">Zum Fall →</a>
+      </div>`;
     }
   }
 
-  // ── Mitgliederliste (letzte 5) ──
   async function loadMembers() {
-    const { data } = await supabase
-      .from('memberships')
-      .select('id, joined_at, role, profiles(full_name)')
-      .eq('community_id', communityId)
-      .eq('status', 'aktiv')
-      .order('joined_at', { ascending: false })
-      .limit(5);
+    const { data } = await supabase.from('memberships').select('id, joined_at, profiles(full_name)').eq('community_id', communityId).eq('status', 'aktiv').order('joined_at', { ascending: false }).limit(5);
+    if (!data?.length) { document.getElementById('members-list').innerHTML = '<div class="empty-state">Noch keine Mitglieder</div>'; return; }
 
-    if (!data?.length) {
-      document.getElementById('members-list').innerHTML = '<div class="empty-state">Noch keine Mitglieder</div>';
-      return;
-    }
-
-    // Für jeden: hat im aktuellen Monat bezahlt?
     const ids = data.map(m => m.id);
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('membership_id')
-      .in('membership_id', ids)
-      .eq('period_month', month)
-      .eq('period_year', year);
-
+    const { data: payments } = await supabase.from('payments').select('membership_id').in('membership_id', ids).eq('period_month', month).eq('period_year', year);
     const paidIds = new Set(payments?.map(p => p.membership_id));
 
     document.getElementById('members-list').innerHTML = data.map(m => {
       const paid = paidIds.has(m.id);
       const name = m.profiles?.full_name || '—';
-      return `
-        <div class="row" style="grid-template-columns: 28px 1fr 80px">
-          <div class="avatar ${paid ? 'av-green' : 'av-gray'}">${initials(name)}</div>
-          <div>
-            <div class="name-line">${name}</div>
-            <div class="sub-line">seit ${formatDate(m.joined_at)}</div>
-          </div>
-          <div class="text-right">
-            <span class="pill ${paid ? 'pill-green' : 'pill-amber'}">${paid ? 'Bezahlt' : 'Offen'}</span>
-          </div>
-        </div>`;
+      return `<div class="row" style="grid-template-columns:30px 1fr auto">
+        <div class="avatar ${paid ? 'av-green' : 'av-gray'}">${initials(name)}</div>
+        <div><div class="name-line">${name}</div><div class="sub-line">${formatDate(m.joined_at)}</div></div>
+        <span class="pill ${paid ? 'pill-green' : 'pill-amber'}">${paid ? 'Bezahlt' : 'Offen'}</span>
+      </div>`;
     }).join('');
   }
 
-  // ── Letzte Transaktionen ──
   async function loadTransactions() {
-    const { data } = await supabase
-      .from('transactions')
-      .select('*, profiles(full_name)')
-      .eq('community_id', communityId)
-      .order('created_at', { ascending: false })
-      .limit(4);
-
-    if (!data?.length) {
-      document.getElementById('tx-list').innerHTML = '<div class="empty-state">Keine Transaktionen</div>';
-      return;
-    }
-
+    const { data } = await supabase.from('transactions').select('*, profiles(full_name)').eq('community_id', communityId).order('created_at', { ascending: false }).limit(4);
+    if (!data?.length) { document.getElementById('tx-list').innerHTML = '<div class="empty-state">Keine Buchungen</div>'; return; }
     document.getElementById('tx-list').innerHTML = data.map(tx => {
       const isIn = tx.direction === 'eingang';
-      const icon = isIn ? '↓' : '↑';
-      const iconBg = isIn ? 'var(--green-light)' : 'var(--red-light)';
-      const amountClass = isIn ? 'mono-green' : 'mono-red';
-      const sign = isIn ? '+' : '−';
-      return `
-        <div class="row" style="grid-template-columns: 28px 1fr 90px">
-          <div class="avatar" style="background:${iconBg};font-size:13px">${icon}</div>
-          <div>
-            <div class="name-line">${tx.description}</div>
-            <div class="sub-line">${formatDate(tx.created_at)} · ${tx.profiles?.full_name ?? '—'}</div>
-          </div>
-          <div class="text-right ${amountClass}">${sign}${formatEur(tx.amount)}</div>
-        </div>`;
+      return `<div class="row" style="grid-template-columns:30px 1fr auto">
+        <div class="avatar" style="background:${isIn ? 'var(--green-light)' : 'var(--red-light)'};color:${isIn ? 'var(--green-dark)' : 'var(--red)'};font-size:14px;font-weight:500">${isIn ? '↓' : '↑'}</div>
+        <div><div class="name-line">${tx.description}</div><div class="sub-line">${formatDate(tx.created_at)}</div></div>
+        <div class="${isIn ? 'mono-green' : 'mono-red'}">${isIn ? '+' : '−'}${formatEur(tx.amount)}</div>
+      </div>`;
     }).join('');
   }
 
-  // ── Audit Log (letzte 3) ──
   async function loadAudit() {
-    const { data } = await supabase
-      .from('audit_log')
-      .select('*, profiles(full_name)')
-      .eq('community_id', communityId)
-      .order('created_at', { ascending: false })
-      .limit(3);
-
-    if (!data?.length) {
-      document.getElementById('audit-list').innerHTML = '<div class="empty-state">Keine Einträge</div>';
-      return;
-    }
-
+    const { data } = await supabase.from('audit_log').select('*, profiles(full_name)').eq('community_id', communityId).order('created_at', { ascending: false }).limit(4);
+    if (!data?.length) { document.getElementById('audit-list').innerHTML = '<div class="empty-state">Keine Einträge</div>'; return; }
     document.getElementById('audit-list').innerHTML = data.map(a => {
-      const time = new Date(a.created_at).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
-      return `
-        <div class="audit-row">
-          <div class="audit-time">${time}</div>
-          <div><span class="audit-actor">${a.profiles?.full_name ?? '—'}</span> · ${a.action}</div>
-        </div>`;
+      const time = new Date(a.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      return `<div class="audit-row"><div class="audit-time">${time}</div><div><span class="audit-actor">${a.profiles?.full_name ?? '—'}</span> · ${a.action}</div></div>`;
     }).join('');
   }
 
-  // ── Realtime: Zahlungseingang ──
-  supabase.channel('dashboard-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, () => {
-      loadBalance();
-      loadPaymentMetrics();
-      loadTransactions();
-    })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments' }, () => {
-      loadPaymentMetrics();
-      loadMembers();
-    })
-    .subscribe();
+  supabase.channel('dashboard').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, () => { loadBalance(); loadTransactions(); }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments' }, () => { loadMetrics(); loadMembers(); }).subscribe();
 
-  // ── Alle laden ──
-  await Promise.all([
-    loadBalance(),
-    loadMemberCount(),
-    loadPaymentMetrics(),
-    loadPayouts(),
-    loadOpenCase(),
-    loadMembers(),
-    loadTransactions(),
-    loadAudit(),
-  ]);
+  await Promise.all([loadBalance(), loadBadges(), loadMetrics(), loadPayouts(), loadOpenCase(), loadMembers(), loadTransactions(), loadAudit()]);
 </script>
 </body>
 </html>

@@ -2,21 +2,19 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Jana – Zahlungen</title>
   <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
 <div class="layout">
   <aside class="sidebar" id="sidebar"></aside>
-
   <div class="main">
     <div class="topbar">
       <div class="topbar-title">Zahlungen</div>
       <div class="topbar-actions">
-        <select id="month-select" class="form-select" style="font-size:12px; padding:6px 10px; width:auto">
-        </select>
-        <button class="btn btn-primary" id="batch-btn">Batch-Eintrag</button>
+        <select id="month-select" class="form-select" style="font-size:13px;padding:6px 28px 6px 10px;width:auto"></select>
+        <button class="btn btn-primary" id="batch-btn">Batch</button>
       </div>
     </div>
 
@@ -26,48 +24,42 @@
         <div class="metric">
           <div class="metric-label">Bezahlt</div>
           <div class="metric-value" id="s-paid">—</div>
-          <div class="metric-sub good" id="s-pct">wird geladen</div>
+          <div class="metric-sub" id="s-pct">lädt</div>
         </div>
         <div class="metric">
           <div class="metric-label">Offen</div>
           <div class="metric-value" id="s-open">—</div>
-          <div class="metric-sub" id="s-amount">—</div>
+          <div class="metric-sub" id="s-eur">—</div>
         </div>
         <div class="metric">
           <div class="metric-label">Einnahmen</div>
-          <div class="metric-value" id="s-revenue">—</div>
+          <div class="metric-value" id="s-rev">—</div>
           <div class="metric-sub">diesen Monat</div>
         </div>
+      </div>
+
+      <!-- Suche -->
+      <div>
+        <input type="text" id="search" class="form-input" placeholder="Mitglied suchen…">
       </div>
 
       <!-- Mitgliederliste -->
       <div class="card">
         <div class="card-header">
           <div class="card-title" id="table-title">Mitglieder</div>
-          <div style="display:flex; gap:8px; align-items:center">
-            <input type="text" id="search" class="form-input" placeholder="Suchen…" style="width:160px; font-size:12px; padding:5px 10px">
-          </div>
         </div>
-        <div class="table-head" style="grid-template-columns: 28px 1fr 100px 80px 120px">
-          <div></div>
-          <div>Name</div>
-          <div>Monat</div>
-          <div class="text-center">Status</div>
-          <div class="text-right">Aktion</div>
-        </div>
-        <div id="payments-table">
-          <div class="empty-state">Wird geladen…</div>
-        </div>
+        <div id="payments-table"><div class="empty-state">Wird geladen…</div></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Modal: Einzelzahlung eintragen -->
+<!-- Modal: Einzelzahlung -->
 <div class="modal-overlay hidden" id="modal-payment">
   <div class="modal">
+    <div class="modal-handle"></div>
     <div class="modal-header">
-      <div class="modal-title" id="modal-payment-title">Zahlung eintragen</div>
+      <div class="modal-title" id="mp-title">Zahlung eintragen</div>
       <button class="modal-close" id="mp-close">×</button>
     </div>
     <div class="modal-body">
@@ -75,40 +67,33 @@
         <label class="form-label">Mitglied</label>
         <input type="text" id="mp-member" class="form-input" disabled>
       </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">Betrag (€)</label>
-          <input type="number" id="mp-amount" class="form-input" step="0.01" min="0">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Bezahlt am</label>
-          <input type="date" id="mp-date" class="form-input">
-        </div>
+      <div class="form-group">
+        <label class="form-label">Betrag (€)</label>
+        <input type="number" id="mp-amount" class="form-input" inputmode="decimal" step="0.01">
       </div>
       <div class="form-group">
-        <label class="form-label">Notiz (optional)</label>
-        <input type="text" id="mp-note" class="form-input" placeholder="z. B. bar übergeben">
+        <label class="form-label">Notiz</label>
+        <input type="text" id="mp-note" class="form-input" placeholder="z. B. bar">
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn" id="mp-cancel">Abbrechen</button>
-      <button class="btn btn-primary" id="mp-save">Zahlung speichern</button>
+      <button class="btn btn-primary" id="mp-save">Speichern</button>
     </div>
   </div>
 </div>
 
-<!-- Modal: Batch-Eintrag -->
+<!-- Modal: Batch -->
 <div class="modal-overlay hidden" id="modal-batch">
-  <div class="modal" style="max-width: 560px">
+  <div class="modal">
+    <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title">Batch-Eintrag</div>
       <button class="modal-close" id="mb-close">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12px; color:var(--text-muted); margin-bottom:8px">
-        Wähle alle Mitglieder aus, die diesen Monat gezahlt haben:
-      </p>
-      <div id="batch-list" style="max-height:300px; overflow-y:auto; border:0.5px solid var(--border); border-radius:var(--radius-sm)"></div>
+      <p style="font-size:13px;color:var(--text-muted)">Wähle alle Mitglieder, die diesen Monat gezahlt haben:</p>
+      <div id="batch-list" style="max-height:50vh;overflow-y:auto;border:0.5px solid var(--border);border-radius:var(--radius-sm)"></div>
     </div>
     <div class="modal-footer">
       <button class="btn" id="mb-cancel">Abbrechen</button>
@@ -125,236 +110,117 @@
   const membership = await requireAuth();
   if (!membership) throw new Error('not logged in');
   renderLayout('payments');
-
   const communityId = getCommunityId();
-  if (!isAdmin()) {
-    document.getElementById('batch-btn').style.display = 'none';
-  }
+  if (!isAdmin()) document.getElementById('batch-btn').style.display = 'none';
 
-  // Monatsselektor befüllen (letzten 12 Monate)
   const monthSelect = document.getElementById('month-select');
   const today = new Date();
   for (let i = 0; i < 12; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const m = d.getMonth() + 1;
-    const y = d.getFullYear();
     const opt = document.createElement('option');
-    opt.value = `${y}-${m}`;
-    opt.textContent = monthLabel(m, y);
+    opt.value = `${d.getFullYear()}-${d.getMonth() + 1}`;
+    opt.textContent = monthLabel(d.getMonth() + 1, d.getFullYear());
     if (i === 0) opt.selected = true;
     monthSelect.appendChild(opt);
   }
 
-  let selMonth, selYear, allMembers = [], paidMap = {}, communityFee = 5;
+  let selMonth, selYear, allMembers = [], paidMap = {}, communityFee = 5, searchTerm = '', activeMemberId = null;
 
   async function loadMonth() {
     const [y, m] = monthSelect.value.split('-');
-    selYear  = parseInt(y);
-    selMonth = parseInt(m);
-    document.getElementById('table-title').textContent = `Mitglieder — ${monthLabel(selMonth, selYear)}`;
-
-    // Community-Beitrag
+    selYear = parseInt(y); selMonth = parseInt(m);
+    document.getElementById('table-title').textContent = monthLabel(selMonth, selYear);
     const { data: comm } = await supabase.from('communities').select('monthly_fee').eq('id', communityId).single();
     communityFee = comm?.monthly_fee ?? 5;
-
-    // Mitglieder
-    const { data: members } = await supabase
-      .from('memberships')
-      .select('id, joined_at, profiles(full_name)')
-      .eq('community_id', communityId)
-      .eq('status', 'aktiv')
-      .order('joined_at');
+    const { data: members } = await supabase.from('memberships').select('id, joined_at, profiles(full_name)').eq('community_id', communityId).eq('status', 'aktiv').order('joined_at');
     allMembers = members || [];
-
-    // Zahlungen diesen Monat
     const ids = allMembers.map(m => m.id);
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('membership_id, amount, paid_at, note')
-      .in('membership_id', ids)
-      .eq('period_month', selMonth)
-      .eq('period_year',  selYear);
+    const { data: payments } = await supabase.from('payments').select('membership_id, amount, note').in('membership_id', ids).eq('period_month', selMonth).eq('period_year', selYear);
     paidMap = {};
     payments?.forEach(p => { paidMap[p.membership_id] = p; });
-
-    updateSummary();
-    renderTable();
-    renderBatchList();
+    updateSummary(); renderTable(); renderBatch();
   }
 
   function updateSummary() {
-    const total  = allMembers.length;
-    const paid   = Object.keys(paidMap).length;
-    const open   = total - paid;
-    const pct    = total ? Math.round((paid / total) * 100) : 0;
-    const revenue = paid * communityFee;
-    const outstanding = open * communityFee;
-
-    document.getElementById('s-paid').textContent    = `${paid} / ${total}`;
-    document.getElementById('s-pct').textContent     = `${pct} % haben gezahlt`;
-    document.getElementById('s-pct').className       = `metric-sub ${pct >= 80 ? 'good' : 'warn'}`;
-    document.getElementById('s-open').textContent    = open;
-    document.getElementById('s-amount').textContent  = `${formatEur(outstanding)} ausstehend`;
-    document.getElementById('s-revenue').textContent = formatEur(revenue);
+    const total = allMembers.length, paid = Object.keys(paidMap).length, open = total - paid;
+    const pct = total ? Math.round((paid / total) * 100) : 0;
+    document.getElementById('s-paid').textContent = `${paid} / ${total}`;
+    document.getElementById('s-pct').textContent  = `${pct} % bezahlt`;
+    document.getElementById('s-pct').className    = `metric-sub ${pct >= 80 ? 'good' : 'warn'}`;
+    document.getElementById('s-open').textContent = open;
+    document.getElementById('s-eur').textContent  = `${formatEur(open * communityFee)}`;
+    document.getElementById('s-rev').textContent  = formatEur(paid * communityFee);
   }
 
-  let searchTerm = '';
   function renderTable() {
     const q = searchTerm.toLowerCase();
-    const list = allMembers.filter(m =>
-      !q || m.profiles?.full_name?.toLowerCase().includes(q)
-    );
-    const el = document.getElementById('payments-table');
-
-    if (!list.length) {
-      el.innerHTML = '<div class="empty-state">Keine Mitglieder gefunden</div>';
-      return;
-    }
-
-    el.innerHTML = list.map(m => {
-      const name  = m.profiles?.full_name || '—';
-      const paid  = paidMap[m.id];
-      const pill  = paid ? '<span class="pill pill-green">Bezahlt</span>' : '<span class="pill pill-amber">Offen</span>';
-      const action = !paid && isAdmin()
-        ? `<button class="btn btn-sm btn-primary" onclick="openPayment('${m.id}', '${name}')">Eintragen</button>`
-        : paid ? `<span class="mono text-muted">${formatEur(paid.amount)}</span>` : '';
-
-      return `
-        <div class="row" style="grid-template-columns: 28px 1fr 100px 80px 120px">
-          <div class="avatar ${paid ? 'av-green' : 'av-gray'}">${initials(name)}</div>
-          <div>
-            <div class="name-line">${name}</div>
-            <div class="sub-line">${paid?.note || (paid ? 'eingetragen' : 'noch nicht bezahlt')}</div>
-          </div>
-          <div class="text-muted text-small">${monthLabel(selMonth, selYear)}</div>
-          <div class="text-center">${pill}</div>
-          <div class="text-right">${action}</div>
-        </div>`;
+    const list = allMembers.filter(m => !q || m.profiles?.full_name?.toLowerCase().includes(q));
+    if (!list.length) { document.getElementById('payments-table').innerHTML = '<div class="empty-state">Keine Mitglieder</div>'; return; }
+    document.getElementById('payments-table').innerHTML = list.map(m => {
+      const name = m.profiles?.full_name || '—';
+      const paid = paidMap[m.id];
+      return `<div class="row" style="grid-template-columns:30px 1fr auto ${!paid && isAdmin() ? '70px' : ''}">
+        <div class="avatar ${paid ? 'av-green' : 'av-gray'}">${initials(name)}</div>
+        <div>
+          <div class="name-line">${name}</div>
+          <div class="sub-line">${paid ? `${formatEur(paid.amount)} — ${paid.note || 'eingetragen'}` : 'noch offen'}</div>
+        </div>
+        <span class="pill ${paid ? 'pill-green' : 'pill-amber'}">${paid ? 'Bezahlt' : 'Offen'}</span>
+        ${!paid && isAdmin() ? `<button class="btn btn-sm btn-primary" onclick="openPay('${m.id}','${name}')">Eintragen</button>` : ''}
+      </div>`;
     }).join('');
   }
 
-  function renderBatchList() {
+  function renderBatch() {
     const unpaid = allMembers.filter(m => !paidMap[m.id]);
     document.getElementById('batch-list').innerHTML = unpaid.map(m => `
-      <label style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:0.5px solid var(--border); cursor:pointer; font-size:13px">
-        <input type="checkbox" data-id="${m.id}" style="width:15px; height:15px; accent-color:var(--green)">
-        <div class="avatar av-gray" style="width:24px;height:24px;font-size:10px">${initials(m.profiles?.full_name)}</div>
-        ${m.profiles?.full_name || '—'}
-      </label>`).join('') || '<div class="empty-state">Alle haben bereits gezahlt!</div>';
+      <label style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;font-size:13px">
+        <input type="checkbox" data-id="${m.id}" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0">
+        <div class="avatar av-gray" style="width:26px;height:26px;font-size:10px;flex-shrink:0">${initials(m.profiles?.full_name)}</div>
+        <span>${m.profiles?.full_name || '—'}</span>
+      </label>`).join('') || '<div class="empty-state">Alle haben gezahlt! 🎉</div>';
   }
 
-  // Einzelzahlung Modal
-  let activeMemberId = null;
-  window.openPayment = (id, name) => {
+  window.openPay = (id, name) => {
     activeMemberId = id;
-    document.getElementById('mp-member').value  = name;
-    document.getElementById('mp-amount').value  = communityFee;
-    document.getElementById('mp-date').value    = new Date().toISOString().split('T')[0];
-    document.getElementById('mp-note').value    = '';
-    document.getElementById('modal-payment-title').textContent = `Zahlung — ${name}`;
+    document.getElementById('mp-member').value = name;
+    document.getElementById('mp-amount').value = communityFee;
+    document.getElementById('mp-note').value   = '';
+    document.getElementById('mp-title').textContent = `Zahlung — ${name}`;
     openModal('modal-payment');
   };
 
   document.getElementById('mp-close').addEventListener('click',  () => closeModal('modal-payment'));
   document.getElementById('mp-cancel').addEventListener('click', () => closeModal('modal-payment'));
-
   document.getElementById('mp-save').addEventListener('click', async () => {
     const amount = parseFloat(document.getElementById('mp-amount').value);
     const note   = document.getElementById('mp-note').value.trim();
-    const paidAt = document.getElementById('mp-date').value;
     if (!amount) return showToast('Betrag eingeben', 'error');
-
-    const btn = document.getElementById('mp-save');
-    btn.disabled = true;
-
+    const btn = document.getElementById('mp-save'); btn.disabled = true;
     const user = (await supabase.auth.getUser()).data.user;
-
-    // Zahlung eintragen
-    const { error: payErr } = await supabase.from('payments').insert({
-      membership_id: activeMemberId,
-      amount, note, period_month: selMonth, period_year: selYear,
-      paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
-      recorded_by: user?.id,
-    });
-    if (payErr) { showToast('Fehler', 'error'); btn.disabled = false; return; }
-
-    // Transaktion eintragen (Eingang in Kasse)
-    await supabase.from('transactions').insert({
-      community_id: communityId,
-      amount,
-      direction: 'eingang',
-      description: `Beitrag ${monthLabel(selMonth, selYear)} — ${document.getElementById('mp-member').value}`,
-      recorded_by: user?.id,
-    });
-
-    const name = document.getElementById('mp-member').value;
-    await writeAuditLog(`Beitrag eingetragen: ${name} ${monthLabel(selMonth, selYear)}`, 'payment', activeMemberId);
-
-    showToast(`Zahlung für ${name} gespeichert`);
-    closeModal('modal-payment');
-    btn.disabled = false;
-    await loadMonth();
+    const { error } = await supabase.from('payments').insert({ membership_id: activeMemberId, amount, note, period_month: selMonth, period_year: selYear, paid_at: new Date().toISOString(), recorded_by: user?.id });
+    if (error) { showToast('Fehler', 'error'); btn.disabled = false; return; }
+    await supabase.from('transactions').insert({ community_id: communityId, amount, direction: 'eingang', description: `Beitrag ${monthLabel(selMonth, selYear)} — ${document.getElementById('mp-member').value}`, recorded_by: user?.id });
+    await writeAuditLog(`Beitrag: ${document.getElementById('mp-member').value} ${monthLabel(selMonth, selYear)}`, 'payment', activeMemberId);
+    showToast('Gespeichert'); closeModal('modal-payment'); btn.disabled = false; await loadMonth();
   });
 
-  // Batch Modal
   document.getElementById('batch-btn').addEventListener('click', () => openModal('modal-batch'));
   document.getElementById('mb-close').addEventListener('click',  () => closeModal('modal-batch'));
   document.getElementById('mb-cancel').addEventListener('click', () => closeModal('modal-batch'));
-
   document.getElementById('mb-save').addEventListener('click', async () => {
     const checked = [...document.querySelectorAll('#batch-list input:checked')];
     if (!checked.length) return showToast('Niemanden ausgewählt', 'error');
-
-    const btn = document.getElementById('mb-save');
-    btn.disabled = true;
-    btn.textContent = 'Wird gespeichert…';
-
+    const btn = document.getElementById('mb-save'); btn.disabled = true; btn.textContent = '…';
     const user = (await supabase.auth.getUser()).data.user;
-
-    const paymentRows = checked.map(c => ({
-      membership_id: c.dataset.id,
-      amount: communityFee,
-      period_month: selMonth, period_year: selYear,
-      paid_at: new Date().toISOString(),
-      recorded_by: user?.id,
-    }));
-
-    const txRows = checked.map(() => ({
-      community_id: communityId,
-      amount: communityFee,
-      direction: 'eingang',
-      description: `Beitrags-Batch ${monthLabel(selMonth, selYear)} (${checked.length} Mitglieder)`,
-      recorded_by: user?.id,
-    }));
-
-    await supabase.from('payments').insert(paymentRows);
-    // Nur eine Sammel-Transaktion
-    await supabase.from('transactions').insert({
-      community_id: communityId,
-      amount: communityFee * checked.length,
-      direction: 'eingang',
-      description: `Beitrags-Batch ${monthLabel(selMonth, selYear)} — ${checked.length} Mitglieder`,
-      recorded_by: user?.id,
-    });
-
-    await writeAuditLog(
-      `Batch-Eintrag: ${checked.length} Zahlungen für ${monthLabel(selMonth, selYear)}`,
-      'payment', null, { count: checked.length }
-    );
-
-    showToast(`${checked.length} Zahlungen eingetragen`);
-    closeModal('modal-batch');
-    btn.disabled = false;
-    btn.textContent = 'Ausgewählte speichern';
+    await supabase.from('payments').insert(checked.map(c => ({ membership_id: c.dataset.id, amount: communityFee, period_month: selMonth, period_year: selYear, paid_at: new Date().toISOString(), recorded_by: user?.id })));
+    await supabase.from('transactions').insert({ community_id: communityId, amount: communityFee * checked.length, direction: 'eingang', description: `Batch ${monthLabel(selMonth, selYear)} — ${checked.length} Mitglieder`, recorded_by: user?.id });
+    await writeAuditLog(`Batch: ${checked.length} Zahlungen ${monthLabel(selMonth, selYear)}`, 'payment', null);
+    showToast(`${checked.length} Zahlungen eingetragen`); closeModal('modal-batch'); btn.disabled = false; btn.textContent = 'Ausgewählte speichern';
     await loadMonth();
   });
 
-  // Suche
-  document.getElementById('search').addEventListener('input', e => {
-    searchTerm = e.target.value;
-    renderTable();
-  });
-
+  document.getElementById('search').addEventListener('input', e => { searchTerm = e.target.value; renderTable(); });
   monthSelect.addEventListener('change', loadMonth);
   await loadMonth();
 </script>
