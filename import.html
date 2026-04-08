@@ -183,7 +183,7 @@
 
   const membership = await requireAuth();
   if (!membership) throw new Error('not logged in');
-  if (!isAdmin()) { window.location.href = '/index.html'; return; }
+  if (!isAdmin()) { window.location.href = '/index.html'; throw new Error('no access'); }
   renderLayout('import');
 
   const communityId = getCommunityId();
