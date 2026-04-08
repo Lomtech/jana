@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Jana – Registrieren</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+    .wrap { width:100%; max-width:380px; display:flex; flex-direction:column; gap:20px; }
+    .logo-row { display:flex; align-items:center; gap:12px; }
+    .logo-icon { width:36px; height:36px; background:var(--green); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .logo-icon svg { width:18px; height:18px; fill:white; }
+    .logo-name { font-size:18px; font-weight:500; }
+    .logo-sub  { font-size:12px; color:var(--text-muted); }
+    .card-body { padding:22px; display:flex; flex-direction:column; gap:14px; }
+    .card-title { font-size:15px; font-weight:500; margin-bottom:2px; }
+    .card-sub   { font-size:12px; color:var(--text-muted); }
+    .msg { border-radius:var(--radius-sm); padding:9px 12px; font-size:13px; display:none; }
+    .msg-error   { background:var(--red-light);   color:var(--red); }
+    .msg-success { background:var(--green-light); color:var(--green-dark); }
+    .login-link  { text-align:center; font-size:12px; color:var(--text-muted); }
+    .login-link a{ color:var(--green-dark); text-decoration:none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo-row">
+    <div class="logo-icon">
+      <svg viewBox="0 0 16 16"><path d="M8 1L2 4v4c0 3.3 2.6 6 6 7 3.4-1 6-3.7 6-7V4L8 1z"/></svg>
+    </div>
+    <div>
+      <div class="logo-name">Jana</div>
+      <div class="logo-sub">Bestattungskasse</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div>
+        <div class="card-title">Registrieren</div>
+        <div class="card-sub">Als Mitglied der Bestattungskasse anmelden</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Vollständiger Name *</label>
+        <input type="text" id="name" class="form-input" placeholder="Ahmad Khalid" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-Mail *</label>
+        <input type="email" id="email" class="form-input" placeholder="name@beispiel.de" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort *</label>
+        <input type="password" id="password" class="form-input" placeholder="Mindestens 8 Zeichen" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Telefon</label>
+        <input type="tel" id="phone" class="form-input" placeholder="+49 170 000 0000" autocomplete="tel">
+      </div>
+
+      <div id="msg-error"   class="msg msg-error"></div>
+      <div id="msg-success" class="msg msg-success"></div>
+
+      <button class="btn btn-primary" id="reg-btn" style="width:100%;padding:10px;font-size:14px">
+        Registrieren
+      </button>
+
+      <div class="login-link">
+        Bereits registriert? <a href="/login.html">Anmelden</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { supabase } from '/js/client.js';
+
+  const COMMUNITY_SLUG = 'jana-haupt'; // ← muss mit deinem slug übereinstimmen
+
+  function showError(msg)   { const el = document.getElementById('msg-error');   el.textContent = msg; el.style.display = 'block'; document.getElementById('msg-success').style.display = 'none'; }
+  function showSuccess(msg) { const el = document.getElementById('msg-success'); el.textContent = msg; el.style.display = 'block'; document.getElementById('msg-error').style.display = 'none'; }
+
+  // Schon eingeloggt?
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) window.location.href = '/index.html';
+
+  document.getElementById('reg-btn').addEventListener('click', async () => {
+    const name     = document.getElementById('name').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const phone    = document.getElementById('phone').value.trim();
+
+    if (!name)            return showError('Name ist Pflichtfeld.');
+    if (!email)           return showError('E-Mail ist Pflichtfeld.');
+    if (password.length < 8) return showError('Passwort muss mindestens 8 Zeichen haben.');
+
+    const btn = document.getElementById('reg-btn');
+    btn.disabled = true;
+    btn.textContent = 'Wird registriert…';
+
+    // 1. Supabase Auth User anlegen
+    const { data: authData, error: authErr } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: name } }
+    });
+
+    if (authErr) {
+      showError(authErr.message === 'User already registered'
+        ? 'Diese E-Mail ist bereits registriert. Bitte einloggen.'
+        : `Fehler: ${authErr.message}`);
+      btn.disabled = false;
+      btn.textContent = 'Registrieren';
+      return;
+    }
+
+    const userId = authData.user?.id;
+    if (!userId) {
+      showError('Fehler beim Anlegen des Accounts. Bitte erneut versuchen.');
+      btn.disabled = false;
+      btn.textContent = 'Registrieren';
+      return;
+    }
+
+    // 2. Profil aktualisieren (Trigger hat es bereits angelegt)
+    await supabase.from('profiles').upsert({
+      id: userId,
+      full_name: name,
+      phone: phone || null,
+    });
+
+    // 3. Community laden
+    const { data: community } = await supabase
+      .from('communities')
+      .select('id')
+      .eq('slug', COMMUNITY_SLUG)
+      .single();
+
+    if (!community) {
+      showError('Community nicht gefunden. Bitte Admin kontaktieren.');
+      btn.disabled = false;
+      btn.textContent = 'Registrieren';
+      return;
+    }
+
+    // 4. Membership anlegen
+    const { error: memErr } = await supabase.from('memberships').insert({
+      profile_id:   userId,
+      community_id: community.id,
+      role:         'mitglied',
+      status:       'aktiv',
+      joined_at:    new Date().toISOString().split('T')[0],
+    });
+
+    if (memErr && memErr.code !== '23505') { // 23505 = bereits vorhanden
+      showError('Membership konnte nicht angelegt werden. Bitte Admin kontaktieren.');
+      btn.disabled = false;
+      btn.textContent = 'Registrieren';
+      return;
+    }
+
+    // 5. Weiterleitung
+    showSuccess('Erfolgreich registriert! Du wirst weitergeleitet…');
+    setTimeout(() => window.location.href = '/index.html', 1500);
+  });
+</script>
+</body>
+</html>
