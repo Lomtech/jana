@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jana – Mitglieder</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Mitglieder</div>
+      <div class="topbar-actions">
+        <input type="text" id="search" class="form-input" placeholder="Suchen…" style="width:200px; font-size:12px; padding:6px 10px">
+        <button class="btn btn-primary" id="add-btn">+ Mitglied hinzufügen</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar" style="background:var(--bg-card); border-bottom: 0.5px solid var(--border); padding: 0 24px">
+      <div class="tab active" data-tab="alle">Alle (<span id="count-alle">—</span>)</div>
+      <div class="tab" data-tab="offen">Offen (<span id="count-offen">—</span>)</div>
+      <div class="tab" data-tab="ueberfaellig">Überfällig (<span id="count-ueberfaellig">—</span>)</div>
+    </div>
+
+    <div class="content">
+      <div class="card">
+        <div class="table-head" style="grid-template-columns: 28px 1fr 100px 100px 80px 80px 60px">
+          <div></div>
+          <div>Name</div>
+          <div>Mitglied seit</div>
+          <div>Telefon</div>
+          <div>Rolle</div>
+          <div class="text-center">Status Apr.</div>
+          <div></div>
+        </div>
+        <div id="members-table">
+          <div class="empty-state">Wird geladen…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Mitglied hinzufügen -->
+<div class="modal-overlay hidden" id="modal-add">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Neues Mitglied</div>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Vollständiger Name *</label>
+          <input type="text" id="f-name" class="form-input" placeholder="Ahmad Khalid">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-Mail *</label>
+          <input type="email" id="f-email" class="form-input" placeholder="name@beispiel.de">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input type="tel" id="f-phone" class="form-input" placeholder="+49 170 000 0000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Beitrittsdatum</label>
+          <input type="date" id="f-joined" class="form-input">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adresse</label>
+        <input type="text" id="f-address" class="form-input" placeholder="Musterstraße 1, 80333 München">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rolle</label>
+        <select id="f-role" class="form-select">
+          <option value="mitglied">Mitglied</option>
+          <option value="kassenwart">Kassenwart</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div style="background:var(--amber-light); border:0.5px solid var(--amber-border); border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:#633806">
+        Eine Einladungs-E-Mail wird an die angegebene Adresse gesendet. Das Mitglied muss sich selbst ein Passwort setzen.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="modal-cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="modal-save">Einladen & speichern</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuth, isAdmin } from '/js/auth-guard.js';
+  import { supabase, getCommunityId, writeAuditLog } from '/js/client.js';
+  import { renderLayout, showToast, openModal, closeModal, formatDate, initials } from '/js/ui.js';
+
+  const membership = await requireAuth();
+  if (!membership) throw new Error('not logged in');
+  renderLayout('members');
+
+  const communityId = getCommunityId();
+  const now   = new Date();
+  const month = now.getMonth() + 1;
+  const year  = now.getFullYear();
+
+  // Nur Admins dürfen Mitglieder hinzufügen
+  if (!isAdmin()) {
+    document.getElementById('add-btn').style.display = 'none';
+  }
+
+  let allMembers = [];
+  let paidIds    = new Set();
+  let activeTab  = 'alle';
+  let searchTerm = '';
+
+  async function loadAll() {
+    const { data: members } = await supabase
+      .from('memberships')
+      .select('id, joined_at, role, status, profiles(id, full_name, phone, address)')
+      .eq('community_id', communityId)
+      .order('joined_at');
+
+    allMembers = members || [];
+
+    // Zahlungsstatus diesen Monat
+    const ids = allMembers.map(m => m.id);
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('membership_id')
+      .in('membership_id', ids)
+      .eq('period_month', month)
+      .eq('period_year', year);
+    paidIds = new Set(payments?.map(p => p.membership_id));
+
+    // Vormonats-Zahlung für "überfällig" (nicht 2 Monate)
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear  = month === 1 ? year - 1 : year;
+    const { data: prevPayments } = await supabase
+      .from('payments')
+      .select('membership_id')
+      .in('membership_id', ids)
+      .eq('period_month', prevMonth)
+      .eq('period_year', prevYear);
+    const prevPaidIds = new Set(prevPayments?.map(p => p.membership_id));
+
+    allMembers = allMembers.map(m => ({
+      ...m,
+      paidThis:  paidIds.has(m.id),
+      paidPrev:  prevPaidIds.has(m.id),
+    }));
+
+    updateCounts();
+    renderTable();
+  }
+
+  function updateCounts() {
+    const active   = allMembers.filter(m => m.status === 'aktiv');
+    const open     = active.filter(m => !m.paidThis);
+    const overdue  = active.filter(m => !m.paidThis && !m.paidPrev);
+    document.getElementById('count-alle').textContent       = active.length;
+    document.getElementById('count-offen').textContent      = open.length;
+    document.getElementById('count-ueberfaellig').textContent = overdue.length;
+  }
+
+  function getFiltered() {
+    let list = allMembers.filter(m => m.status === 'aktiv');
+    if (activeTab === 'offen')       list = list.filter(m => !m.paidThis);
+    if (activeTab === 'ueberfaellig') list = list.filter(m => !m.paidThis && !m.paidPrev);
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(m => m.profiles?.full_name?.toLowerCase().includes(q));
+    }
+    return list;
+  }
+
+  function renderTable() {
+    const list = getFiltered();
+    const el = document.getElementById('members-table');
+
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-state">Keine Mitglieder gefunden</div>';
+      return;
+    }
+
+    el.innerHTML = list.map(m => {
+      const name  = m.profiles?.full_name || '—';
+      const phone = m.profiles?.phone || '—';
+      const pill  = m.paidThis
+        ? '<span class="pill pill-green">Bezahlt</span>'
+        : (m.paidPrev
+            ? '<span class="pill pill-amber">Offen</span>'
+            : '<span class="pill pill-red">Überfällig</span>');
+      const rolePill = m.role === 'admin' ? '<span class="pill pill-gray">Admin</span>'
+        : m.role === 'kassenwart' ? '<span class="pill pill-gray">Kassenwart</span>'
+        : '';
+
+      return `
+        <div class="row" style="grid-template-columns: 28px 1fr 100px 100px 80px 80px 60px">
+          <div class="avatar ${m.paidThis ? 'av-green' : 'av-gray'}">${initials(name)}</div>
+          <div>
+            <div class="name-line">${name}</div>
+            <div class="sub-line">${m.profiles?.address || '—'}</div>
+          </div>
+          <div class="text-muted text-small">${formatDate(m.joined_at)}</div>
+          <div class="text-muted text-small">${phone}</div>
+          <div>${rolePill}</div>
+          <div class="text-center">${pill}</div>
+          <div class="text-right">
+            ${!m.paidThis && isAdmin()
+              ? `<button class="btn btn-sm" onclick="recordPayment('${m.id}', '${name}')">Eintragen</button>`
+              : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Zahlung schnell eintragen
+  window.recordPayment = async (membershipId, name) => {
+    const { error } = await supabase.from('payments').insert({
+      membership_id: membershipId,
+      amount: membership.communities?.monthly_fee || 5,
+      period_month: month,
+      period_year:  year,
+      recorded_by:  (await supabase.auth.getUser()).data.user?.id,
+    });
+    if (!error) {
+      await writeAuditLog(`Zahlung eingetragen für ${name} — ${month}/${year}`, 'payment', membershipId);
+      showToast(`Zahlung für ${name} eingetragen`);
+      await loadAll();
+    } else {
+      showToast('Fehler beim Eintragen', 'error');
+    }
+  };
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeTab = tab.dataset.tab;
+      renderTable();
+    });
+  });
+
+  // Suche
+  document.getElementById('search').addEventListener('input', e => {
+    searchTerm = e.target.value;
+    renderTable();
+  });
+
+  // Modal Add
+  document.getElementById('add-btn').addEventListener('click', () => {
+    document.getElementById('f-joined').value = new Date().toISOString().split('T')[0];
+    openModal('modal-add');
+  });
+  document.getElementById('modal-close').addEventListener('click',  () => closeModal('modal-add'));
+  document.getElementById('modal-cancel').addEventListener('click', () => closeModal('modal-add'));
+
+  document.getElementById('modal-save').addEventListener('click', async () => {
+    const name    = document.getElementById('f-name').value.trim();
+    const email   = document.getElementById('f-email').value.trim();
+    const phone   = document.getElementById('f-phone').value.trim();
+    const address = document.getElementById('f-address').value.trim();
+    const joined  = document.getElementById('f-joined').value;
+    const role    = document.getElementById('f-role').value;
+
+    if (!name || !email) return showToast('Name und E-Mail sind Pflichtfelder', 'error');
+
+    const saveBtn = document.getElementById('modal-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Wird gespeichert…';
+
+    // 1. Supabase Auth Invite
+    const { data: invited, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email);
+
+    // Fallback: Wenn kein Admin-Zugang → User muss manuell angelegt werden
+    // Für MVP: Profil direkt anlegen (User muss eigenes PW setzen via Magic Link)
+    let userId = invited?.user?.id;
+
+    if (!userId) {
+      // User existiert evtl. schon — Profile via E-Mail suchen
+      // In Production: Server-Side Function nutzen
+      showToast('Hinweis: Einladung per Supabase Admin API nötig. Profil wird vorgemerkt.', 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Einladen & speichern';
+      return;
+    }
+
+    // 2. Profil anlegen
+    await supabase.from('profiles').upsert({
+      id: userId, full_name: name, phone, address
+    });
+
+    // 3. Membership anlegen
+    await supabase.from('memberships').insert({
+      profile_id: userId,
+      community_id: communityId,
+      role,
+      joined_at: joined || new Date().toISOString().split('T')[0],
+    });
+
+    await writeAuditLog(`Mitglied hinzugefügt: ${name}`, 'membership', userId, { email, role });
+
+    showToast(`${name} wurde eingeladen`);
+    closeModal('modal-add');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Einladen & speichern';
+    await loadAll();
+  });
+
+  await loadAll();
+</script>
+</body>
+</html>

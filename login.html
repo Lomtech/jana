@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jana – Anmelden</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
+    .login-wrap { width: 100%; max-width: 360px; padding: 20px; }
+    .login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+    .login-logo .logo-icon { width: 36px; height: 36px; border-radius: 10px; }
+    .login-logo .logo-icon svg { width: 18px; height: 18px; }
+    .login-name { font-size: 18px; font-weight: 500; }
+    .login-desc { font-size: 12px; color: var(--text-muted); }
+    .login-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 24px; }
+    .login-title { font-size: 14px; font-weight: 500; margin-bottom: 20px; }
+    .login-form { display: flex; flex-direction: column; gap: 14px; }
+    .login-divider { text-align: center; font-size: 11px; color: var(--text-faint); margin: 4px 0; position: relative; }
+    .login-divider::before, .login-divider::after {
+      content: ''; position: absolute; top: 50%; width: 40%; height: 0.5px;
+      background: var(--border); transform: translateY(-50%);
+    }
+    .login-divider::before { left: 0; }
+    .login-divider::after { right: 0; }
+    .login-footer { margin-top: 20px; font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.6; }
+    .error-msg { background: var(--red-light); color: var(--red); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; display: none; }
+    .success-msg { background: var(--green-light); color: var(--green-dark); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; display: none; }
+  </style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 16 16" fill="white"><path d="M8 1L2 4v4c0 3.3 2.6 6 6 7 3.4-1 6-3.7 6-7V4L8 1z"/></svg>
+    </div>
+    <div>
+      <div class="login-name">Jana</div>
+      <div class="login-desc">Bestattungskasse</div>
+    </div>
+  </div>
+
+  <div class="login-card">
+    <div class="login-title">Anmelden</div>
+
+    <div class="login-form">
+      <!-- E-Mail + Passwort -->
+      <div class="form-group">
+        <label class="form-label">E-Mail</label>
+        <input type="email" id="email" class="form-input" placeholder="name@beispiel.de" autocomplete="email">
+      </div>
+      <div class="form-group" id="pw-group">
+        <label class="form-label">Passwort</label>
+        <input type="password" id="password" class="form-input" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <div id="error-msg" class="error-msg"></div>
+      <div id="success-msg" class="success-msg"></div>
+
+      <button class="btn btn-primary" id="login-btn" style="width:100%; padding: 9px 14px; font-size: 13px;">
+        Anmelden
+      </button>
+
+      <div class="login-divider">oder</div>
+
+      <button class="btn" id="magic-btn" style="width:100%; padding: 9px 14px; font-size: 12px;">
+        Magic Link per E-Mail senden
+      </button>
+    </div>
+  </div>
+
+  <div class="login-footer">
+    Jana verwaltet kein Geld direkt.<br>
+    Alle Daten liegen sicher bei deiner Moschee / deinem Verein.
+  </div>
+</div>
+
+<script type="module">
+  import { supabase } from '/js/client.js';
+
+  const emailEl    = document.getElementById('email');
+  const pwEl       = document.getElementById('password');
+  const loginBtn   = document.getElementById('login-btn');
+  const magicBtn   = document.getElementById('magic-btn');
+  const errorMsg   = document.getElementById('error-msg');
+  const successMsg = document.getElementById('success-msg');
+
+  function showErr(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.style.display = 'block';
+    successMsg.style.display = 'none';
+  }
+  function showSuccess(msg) {
+    successMsg.textContent = msg;
+    successMsg.style.display = 'block';
+    errorMsg.style.display = 'none';
+  }
+
+  // Passwort-Login
+  loginBtn.addEventListener('click', async () => {
+    const email    = emailEl.value.trim();
+    const password = pwEl.value;
+    if (!email || !password) return showErr('Bitte E-Mail und Passwort eingeben.');
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Anmelden…';
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      showErr('Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.');
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Anmelden';
+    } else {
+      window.location.href = '/index.html';
+    }
+  });
+
+  // Magic Link
+  magicBtn.addEventListener('click', async () => {
+    const email = emailEl.value.trim();
+    if (!email) return showErr('Bitte zuerst E-Mail eingeben.');
+
+    magicBtn.disabled = true;
+    magicBtn.textContent = 'Wird gesendet…';
+
+    const { error } = await supabase.auth.signInWithOtp({ email });
+
+    if (error) {
+      showErr('Fehler beim Senden. Bitte erneut versuchen.');
+    } else {
+      showSuccess(`Magic Link gesendet an ${email}. Bitte E-Mails prüfen.`);
+      document.getElementById('pw-group').style.display = 'none';
+    }
+    magicBtn.disabled = false;
+    magicBtn.textContent = 'Magic Link per E-Mail senden';
+  });
+
+  // Enter-Taste
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') loginBtn.click();
+  });
+
+  // Schon eingeloggt?
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) window.location.href = '/index.html';
+
+  // Error-Param aus URL
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('error') === 'no_membership') {
+    showErr('Dein Account hat keine aktive Mitgliedschaft. Bitte Admin kontaktieren.');
+  }
+</script>
+</body>
+</html>

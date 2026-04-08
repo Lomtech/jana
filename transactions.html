@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jana – Transaktionen</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Transaktionen</div>
+      <div class="topbar-actions">
+        <select id="filter-dir" class="form-select" style="font-size:12px; padding:6px 10px; width:auto">
+          <option value="">Alle</option>
+          <option value="eingang">Nur Eingänge</option>
+          <option value="ausgang">Nur Ausgänge</option>
+        </select>
+        <button class="btn btn-primary" id="manual-btn">+ Manuell eintragen</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Kassenstand prominent -->
+      <div class="balance-banner">
+        <div>
+          <div class="balance-label">Aktueller Kassenstand</div>
+          <div class="balance-amount" id="balance">Wird berechnet…</div>
+          <div class="balance-meta">Aus allen Transaktionen berechnet — unveränderlich</div>
+        </div>
+        <div class="balance-badges">
+          <div class="balance-badge" id="b-in">Eingänge: —</div>
+          <div class="balance-badge" id="b-out">Ausgänge: —</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Kassenbuch</div>
+          <div class="text-muted text-small">Alle Einträge sind unveränderlich</div>
+        </div>
+        <div class="table-head" style="grid-template-columns: 36px 1fr 120px 100px 80px">
+          <div></div>
+          <div>Beschreibung</div>
+          <div>Eingetragen von</div>
+          <div>Datum</div>
+          <div class="text-right">Betrag</div>
+        </div>
+        <div id="tx-table">
+          <div class="empty-state">Wird geladen…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Manuelle Transaktion -->
+<div class="modal-overlay hidden" id="modal-manual">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Transaktion manuell eintragen</div>
+      <button class="modal-close" id="mm-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Richtung *</label>
+        <select id="mm-dir" class="form-select">
+          <option value="eingang">Eingang (+ zur Kasse)</option>
+          <option value="ausgang">Ausgang (− aus Kasse)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Betrag (€) *</label>
+        <input type="number" id="mm-amount" class="form-input" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Beschreibung *</label>
+        <input type="text" id="mm-desc" class="form-input" placeholder="z. B. Sonderzahlung von Bruder Ahmad">
+      </div>
+      <div style="background:var(--amber-light); border:0.5px solid var(--amber-border); border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:#633806">
+        Manuell eingetragene Transaktionen können nicht gelöscht werden. Bei Fehler bitte Gegenbuchung anlegen.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="mm-cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="mm-save">Transaktion speichern</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuth, isAdmin } from '/js/auth-guard.js';
+  import { supabase, getCommunityId, writeAuditLog } from '/js/client.js';
+  import { renderLayout, showToast, openModal, closeModal, formatEur, formatDate } from '/js/ui.js';
+
+  const membership = await requireAuth();
+  if (!membership) throw new Error('not logged in');
+  renderLayout('transactions');
+
+  const communityId = getCommunityId();
+
+  if (!isAdmin()) {
+    document.getElementById('manual-btn').style.display = 'none';
+  }
+
+  let filterDir = '';
+
+  async function load() {
+    // Balance
+    const { data: bal } = await supabase
+      .from('community_balance')
+      .select('*')
+      .eq('community_id', communityId)
+      .single();
+
+    document.getElementById('balance').textContent = formatEur(bal?.balance ?? 0);
+
+    // Summen
+    const { data: txAll } = await supabase
+      .from('transactions')
+      .select('direction, amount')
+      .eq('community_id', communityId);
+
+    const totalIn  = txAll?.filter(t => t.direction === 'eingang').reduce((s, t) => s + t.amount, 0) ?? 0;
+    const totalOut = txAll?.filter(t => t.direction === 'ausgang').reduce((s, t) => s + t.amount, 0) ?? 0;
+    document.getElementById('b-in').textContent  = `Eingänge: ${formatEur(totalIn)}`;
+    document.getElementById('b-out').textContent = `Ausgänge: ${formatEur(totalOut)}`;
+
+    // Transaktionen
+    let query = supabase
+      .from('transactions')
+      .select('*, profiles(full_name)')
+      .eq('community_id', communityId)
+      .order('created_at', { ascending: false });
+
+    if (filterDir) query = query.eq('direction', filterDir);
+
+    const { data: txs } = await query;
+
+    if (!txs?.length) {
+      document.getElementById('tx-table').innerHTML = '<div class="empty-state">Keine Transaktionen</div>';
+      return;
+    }
+
+    let runningBalance = bal?.balance ?? 0;
+    // Für laufende Summe: von oben nach unten (neueste zuerst) kann man nicht leicht machen
+    // Wir zeigen einfach Plus/Minus pro Zeile
+
+    document.getElementById('tx-table').innerHTML = txs.map(tx => {
+      const isIn  = tx.direction === 'eingang';
+      const icon  = isIn ? '↓' : '↑';
+      const iconBg = isIn ? 'var(--green-light)' : 'var(--red-light)';
+      const iconColor = isIn ? 'var(--green-dark)' : 'var(--red)';
+      const amountClass = isIn ? 'mono-green' : 'mono-red';
+      const sign = isIn ? '+' : '−';
+
+      return `
+        <div class="row" style="grid-template-columns: 36px 1fr 120px 100px 80px">
+          <div class="avatar" style="background:${iconBg}; color:${iconColor}; font-size:14px; font-weight:500; width:30px; height:30px;">${icon}</div>
+          <div>
+            <div class="name-line">${tx.description}</div>
+            <div class="sub-line">${tx.case_id ? '🔗 verknüpft mit Todesfall' : 'Allgemeine Transaktion'}</div>
+          </div>
+          <div class="text-muted text-small">${tx.profiles?.full_name || '—'}</div>
+          <div class="text-muted text-small">${formatDate(tx.created_at)}</div>
+          <div class="text-right ${amountClass}">${sign}${formatEur(tx.amount)}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // Filter
+  document.getElementById('filter-dir').addEventListener('change', e => {
+    filterDir = e.target.value;
+    load();
+  });
+
+  // Manuell
+  document.getElementById('manual-btn').addEventListener('click', () => openModal('modal-manual'));
+  document.getElementById('mm-close').addEventListener('click',  () => closeModal('modal-manual'));
+  document.getElementById('mm-cancel').addEventListener('click', () => closeModal('modal-manual'));
+
+  document.getElementById('mm-save').addEventListener('click', async () => {
+    const dir    = document.getElementById('mm-dir').value;
+    const amount = parseFloat(document.getElementById('mm-amount').value);
+    const desc   = document.getElementById('mm-desc').value.trim();
+
+    if (!amount || !desc) return showToast('Alle Felder ausfüllen', 'error');
+
+    const btn = document.getElementById('mm-save');
+    btn.disabled = true;
+
+    const user = (await supabase.auth.getUser()).data.user;
+
+    const { error } = await supabase.from('transactions').insert({
+      community_id: communityId,
+      amount, direction: dir, description: desc,
+      recorded_by: user?.id,
+    });
+
+    if (error) { showToast('Fehler', 'error'); btn.disabled = false; return; }
+
+    await writeAuditLog(
+      `Manuelle Transaktion: ${dir === 'eingang' ? '+' : '−'}${formatEur(amount)} — ${desc}`,
+      'transaction', null
+    );
+
+    showToast('Transaktion gespeichert');
+    closeModal('modal-manual');
+    btn.disabled = false;
+    await load();
+  });
+
+  // Realtime
+  supabase.channel('tx-realtime')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, load)
+    .subscribe();
+
+  await load();
+</script>
+</body>
+</html>
